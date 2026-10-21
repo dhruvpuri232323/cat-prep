@@ -1,0 +1,52 @@
+name: Study nudges
+
+# Every 30 minutes, check what each reminder needs and send it to your phone.
+# GitHub sometimes starts scheduled runs a few minutes late; reminders have a
+# 2.5-hour window, so a late run still sends them.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Send a test notification right now"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: study-nudges
+  cancel-in-progress: false
+
+jobs:
+  nudge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Firebase Admin
+        run: npm install --no-save --no-audit --no-fund --loglevel=error firebase-admin@12
+      - name: Send due reminders
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          NUDGE_TEST: ${{ github.event.inputs.test }}
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: node scripts/nudge.js
+      # GitHub pauses scheduled jobs in repos with no activity for 60 days.
+      # Once a month this writes a tiny file so the reminders keep running.
+      - name: Keep the schedule alive
+        if: github.event_name == 'schedule'
+        run: |
+          month=$(date -u +%Y-%m)
+          if [ "$(cat .github/nudge-heartbeat 2>/dev/null)" != "$month" ]; then
+            echo "$month" > .github/nudge-heartbeat
+            git config user.name "study-nudges"
+            git config user.email "study-nudges@users.noreply.github.com"
+            git add .github/nudge-heartbeat
+            git commit -m "Keep study reminders running ($month)" && git push || true
+          fi
