@@ -2584,7 +2584,7 @@ class MergedColl{constructor(own,book,kind){this.own=own;this.book=book;this.kin
 const morphs=new MergedColl(morphsOwn,BOOK.m,"m");
 const words=new MergedColl(wordsOwn,BOOK.w,"w");
 const isUnlocked=n=>!n.day||n.day<=todayISO();
-const BUILD_ID="2026.10.23-0242";
+const BUILD_ID="2026.10.23-1537";
 let dayNow=todayISO();
 function refreshAll(){deckVer++;try{updateWordsBadge();}catch(e){}
   try{T=todayIndex();week=Math.floor(T.i/7);pRenderAll();}catch(e){}
@@ -2770,8 +2770,8 @@ function logItemHTML(n){const cards=cardsOf(n.kind,n.id),lee=cards.some(isLeech)
   const sj=(SUBJ_MAP[n.subj]||[0,"Mistake"])[1];return `<div class="wl" id="wl-${esc(n.id)}" style="--cc:var(${MT_COL.mistake})"><div class="wl-h"><span class="pill">Mistake · ${esc(sj)}</span><span style="white-space:pre-wrap">${esc(String(n.front).slice(0,240))}</span></div><div class="wl-s" style="white-space:pre-wrap">${esc(String(n.back).slice(0,240))} · <span class="mono">${esc(st)}</span></div>${acts}</div>`;}
 let wLogMax=150;
 function renderWordsLog(){const q=$("w-search").value.trim().toLowerCase(),t=todayISO();
-  $("w-filter").innerHTML=[["all","All"],["root","Roots"],["prefix","Prefixes"],["suffix","Suffixes"],["word","Words"],["book","Word Power"],["bonus","Bonus words"],["mine","Added by me"],["mistake","Mistakes"],["upcoming","Coming up"],["due","Due today"],["tricky","Tricky"],["paused","Paused"]].map(([v,l])=>`<button type="button" class="chip" data-wf="${v}" aria-pressed="${wFilter===v}">${l}</button>`).join("");
-  let N=allNotes().filter(n=>{const up=n.day&&n.day>t;if(wFilter==="upcoming")return !!up;if(up)return false;if(wFilter==="book")return !!n.book&&!n.bonus;if(wFilter==="bonus")return !!n.bonus;if(wFilter==="mine")return !n.book;const cs=cardsOf(n.kind,n.id);
+  $("w-filter").innerHTML=[["all","All"],["root","Roots"],["prefix","Prefixes"],["suffix","Suffixes"],["word","Words"],["book","Word Power"],["bonus","Bonus words"],["mine","Added by me"],["today","Added today"],["mistake","Mistakes"],["upcoming","Coming up"],["due","Due today"],["tricky","Tricky"],["paused","Paused"]].map(([v,l])=>`<button type="button" class="chip" data-wf="${v}" aria-pressed="${wFilter===v}">${l}</button>`).join("")+(wFilter==="today"&&addedNotes().length?`<button type="button" class="btn sm primary" data-added="1" style="margin-left:4px">Practise these as flashcards</button>`:"");
+  let N=allNotes().filter(n=>{const up=n.day&&n.day>t;if(wFilter==="upcoming")return !!up;if(up)return false;if(wFilter==="book")return !!n.book&&!n.bonus;if(wFilter==="bonus")return !!n.bonus;if(wFilter==="mine")return !n.book;if(wFilter==="today")return isAddedOn(n,t);const cs=cardsOf(n.kind,n.id);
     return wFilter==="all"||(wFilter==="word"?n.kind==="w":wFilter==="mistake"?n.kind==="x":wFilter==="due"?cs.some(c=>!c.susp&&srsOf(c).due<=t):wFilter==="tricky"?cs.some(isLeech):wFilter==="paused"?!!n.susp:n.kind==="m"&&n.type===wFilter);});
   if(q)N=N.filter(n=>[n.text,n.word,n.meaning,n.example,n.source,n.origin,n.front,n.back,n.trick].some(x=>String(x||"").toLowerCase().includes(q))||(n.kind==="w"&&breakdown(n).some(m=>normText(m.text).includes(q))));
   const groups={};N.forEach(n=>{const d=n.day||"";(groups[d]=groups[d]||[]).push(n);});
@@ -2816,11 +2816,18 @@ function checkAnswer(c,typed){const wordish=(c.kind==="m"&&c.dir==="r")||(c.kind
   const T=keyTok(typed),E=keyTok(c.kind==="x"?c.back:c.meaning);if(!E.length)return {lv:2,msg:"Compare it with the answer"};
   const hit=E.filter(e=>T.some(t=>t===e||(t.length>=4&&e.length>=4&&(t.startsWith(e.slice(0,4))||e.startsWith(t.slice(0,4))))));const r=hit.length/E.length;
   return {lv:r>=.6?3:r>0?2:1,msg:r>=.6?`You got it: ${hit.length} of ${E.length} key words`:r>0?`Partly: ${hit.length} of ${E.length} key words`:"Not quite",hit};}
+/* what you added yourself on a given day (words, roots/affixes, mistake cards) */
+const isAddedOn=(n,d)=>!n.book&&!!n.created&&isoOf(new Date(n.created))===d;
+const addedNotes=d=>allNotes().filter(n=>isAddedOn(n,d||todayISO()));
+function practiseAdded(d){d=d||todayISO();const ids=new Set(addedNotes(d).map(n=>n.kind+n.id));
+  const C=allCards().filter(c=>!c.susp&&ids.has(c.kind+c.nid));if(!C.length){toast("Nothing added today yet. Add words in Words → Add.");return;}
+  startReview({cards:C,label:d===todayISO()?"added today":`added ${shortD(d)}`});}
+document.addEventListener("click",e=>{if(e.target.closest("[data-added]")){e.preventDefault();practiseAdded();}});
 function renderRevHome(){if(document.activeElement&&document.activeElement.id==="w-newlim")return;
   const d=dueCards(),n=d.rev.length+d.fresh.length,tom=dueCards(addDays(todayISO(),1)),vp=vprefs(),doneToday=(vp.log||{})[todayISO()]||0,dirs=dirsOn();
   const tn=tom.rev.length,U=allCards().some(isUnlocked),ns=nextSet(),nsTxt=ns?`${sessLabel(ns.sess)}, ${ns.n} new cards`:"";
   $("w-revhome").innerHTML=`<div class="rev-home"><div><h3 style="font-size:20px">Today's flashcards</h3><p class="muted">${n?`${n} card${n>1?"s":""} due: ${d.rev.length} to review, ${d.fresh.length} new.`:U?`All done for today${doneToday?` (${doneToday} reviewed)`:""}.${tn?` About ${tn} review${tn>1?"s":""} tomorrow.`:""}${ns?` Next Word Power set (${nsTxt}) arrives ${whenLabel(ns.day)}. Want more now? Start it early.`:""}`:ns?`Your Word Power flashcards start ${whenLabel(ns.day)} with ${nsTxt}. Want a head start? Start them now.`:"Your first cards appear here as soon as you add roots and words."}${d.bookWait?` ${d.bookWait} more new Word Power card${d.bookWait>1?"s":""} from earlier sessions are queued: they come in ${BOOK_DOSE} a day so nothing piles up.`:""}${n>50?" You can stop any time: progress saves after every card.":""}${d.freshAll-d.fresh.length-(d.bookWait||0)>0?` ${d.freshAll-d.fresh.length-(d.bookWait||0)} more of your own new cards wait for later days (limit ${vp.newLimit||20} a day).`:""}</p></div>
-    <div class="rev-btns">${n?`<button type="button" class="btn primary" id="w-start">Start review</button>`:""}${!n&&d.bookWait?`<button type="button" class="btn primary" data-morenew="1">Learn 30 more now</button>`:""}${!n&&ns&&!d.bookWait?`<button type="button" class="btn primary" data-ahead="1">Start ${sessLabel(ns.sess)} now</button>`:""}${U?`<button type="button" class="btn" id="w-cram">Practise anything</button>`:""}</div></div>
+    <div class="rev-btns">${n?`<button type="button" class="btn primary" id="w-start">Start review</button>`:""}${!n&&d.bookWait?`<button type="button" class="btn primary" data-morenew="1">Learn 30 more now</button>`:""}${!n&&ns&&!d.bookWait?`<button type="button" class="btn primary" data-ahead="1">Start ${sessLabel(ns.sess)} now</button>`:""}${(()=>{const a=addedNotes().length;return a?`<button type="button" class="btn" data-added="1">Words I added today (${a})</button>`:"";})()}${U?`<button type="button" class="btn" id="w-cram">Practise anything</button>`:""}</div></div>
     <div class="opts"><label><input type="checkbox" class="switch" id="w-typing"${vp.typing?" checked":""}> Type answers before flipping</label>
       <span>Cards:</span>${[["mf","Root → meaning"],["mr","Meaning → root"],["wf","Word → meaning"],["wr","Meaning → word"],["wb","Roots → word"]].map(([k,l])=>`<button type="button" class="chip" data-dir="${k}" aria-pressed="${!!dirs[k]}">${l}</button>`).join("")}
       <label>New a day <input class="in mono" id="w-newlim" type="number" min="1" max="200" value="${vp.newLimit||20}" style="width:70px;padding:5px 7px"></label></div>`;}
@@ -4107,7 +4114,7 @@ let cmdkItems=[],cmdkSel=0;
 function openCmdk(){$("cmdk").hidden=false;$("cmdkIn").value="";renderCmdk();setTimeout(()=>$("cmdkIn").focus(),20);document.documentElement.style.overflow="hidden";}
 function closeCmdk(){if($("cmdk").hidden)return;$("cmdk").hidden=true;document.documentElement.style.overflow="";}
 function cmdCommands(){return [
-  ["Start flashcard review","Words",()=>startReview()],["Log a mistake","Quick add",()=>openQuick("mistake")],["Add a word","Quick add",()=>openQuick("word")],["Add a root, prefix or suffix","Quick add",()=>openQuick("root")],["Add a task","Quick add",()=>openQuick("task")],["Note in today's diary","Quick add",()=>openQuick("note")],
+  ["Start flashcard review","Words",()=>startReview()],["Practise what I added today","Words",()=>practiseAdded()],["Show what I added today","Words",()=>{openTab("words");setWView("log");wFilter="today";renderWordsLog();}],["Log a mistake","Quick add",()=>openQuick("mistake")],["Add a word","Quick add",()=>openQuick("word")],["Add a root, prefix or suffix","Quick add",()=>openQuick("root")],["Add a task","Quick add",()=>openQuick("task")],["Note in today's diary","Quick add",()=>openQuick("note")],
   ["Write in focus mode","Diary",()=>{openTab("diary");setTimeout(openZen,50);}],["Re-plan unfinished work","Plan",openReplan],["Print this week","Plan",()=>printWeek(week)],["Percentile estimator","Mock scores",()=>{openTab("mocks");setTimeout(()=>$("m-pctl").scrollIntoView({block:"start"}),50);}],
   ["Weekly review","Insights",()=>{openTab("insights");}],["Settings","App",()=>openSettings()],["Notifications","App",()=>openSettings("notify")],["Toggle dark mode","App",()=>{const d=document.documentElement.getAttribute("data-theme")==="dark"||(!document.documentElement.getAttribute("data-theme")&&matchMedia("(prefers-color-scheme: dark)").matches);lsSet("hub-theme",d?"light":"dark");applyTheme();}],
   ["Download backup","App",()=>doExport()],
